@@ -59,7 +59,9 @@ Timers: `localhost:5173`. Documentation: `localhost:5173/docs`
 
 1. Open `package.json` and update the `"homepage"` key with your repo information. It should change from:
 
-`"homepage": "https://hes-e39.github.io/assignment-1/"`
+
+//CHANGED FROM assignment-1 to assignment-2//
+`"homepage": "https://hes-e39.github.io/assignment-2/"`
 
 to
 
