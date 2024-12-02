@@ -1,141 +1,188 @@
-// Import necessary React functions and types
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { ReactNode } from 'react'; // Importing ReactNode type for children
+import type { ReactNode } from 'react';
 
-// ------------------- Timer Type Definition -------------------
+// Base timer configuration
+interface BaseTimer {
+    id: string;
+    type: 'stopwatch' | 'countdown' | 'XY' | 'tabata';
+    status: 'not running' | 'running' | 'paused' | 'completed';
+}
 
-// Defining the structure of a Timer object
-export type Timer = {
-    id: string; // A unique identifier for the timer
-    type: 'stopwatch' | 'countdown' | 'XY' | 'tabata'; // Type of timer
-    duration: number; // Total duration of the timer in milliseconds
-    status: 'not running' | 'running' | 'paused' | 'completed'; // Current status of the timer
-};
+// Specific timer configurations
+interface StopwatchTimer extends BaseTimer {
+    type: 'stopwatch';
+    duration: number; // Current elapsed time
+}
 
-// ------------------- Timer Context Type -------------------
+interface CountdownTimer extends BaseTimer {
+    type: 'countdown';
+    duration: number; // Time remaining
+    initialDuration: number; // Starting duration
+}
 
-// Describes the structure of the TimerContext
+interface XYTimer extends BaseTimer {
+    type: 'XY';
+    rounds: number;
+    currentRound: number;
+    workTime: number;
+    restTime: number;
+    isWorking: boolean;
+    duration: number; // Current interval time remaining
+}
+
+interface TabataTimer extends BaseTimer {
+    type: 'tabata';
+    rounds: number;
+    currentRound: number;
+    workTime: number;
+    restTime: number;
+    isWorking: boolean;
+    duration: number; // Current interval time remaining
+}
+
+// Union type of all timer types
+export type Timer = StopwatchTimer | CountdownTimer | XYTimer | TabataTimer;
+
 type TimerContextType = {
-    timers: Timer[]; // Array of all timers
-    currentTimerIndex: number | null; // Index of the currently active timer
-    toggleStartPause: () => void; // Function to start/pause the active timer
-    fastForward: () => void; // Function to complete the current timer and move to the next
-    addTimer: (timer: Timer) => void; // Function to add a new timer
-    resetTimers: () => void; // Function to reset all timers
+    timers: Timer[];
+    currentTimerIndex: number | null;
+    toggleStartPause: () => void;
+    fastForward: () => void;
+    addTimer: (timer: Timer) => void;
+    removeTimer: (id: string) => void;
+    resetTimers: () => void;
+    getTotalTime: () => number;
 };
 
-// ------------------- Creating Timer Context -------------------
-
-// Creating the TimerContext with an initial value of undefined
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
 
-// ------------------- TimerProvider Component -------------------
-
-// TimerProvider wraps the app to provide the TimerContext
 export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // State to hold all timers
     const [timers, setTimers] = useState<Timer[]>([]);
-
-    // State to track the index of the currently active timer
     const [currentTimerIndex, setCurrentTimerIndex] = useState<number | null>(null);
 
-    // ------------------- Timer Logic (useEffect) -------------------
-
-    // Handles updating the active timer's state and duration
     useEffect(() => {
-        if (currentTimerIndex === null) return; // Do nothing if no timer is active
+        if (currentTimerIndex === null) return;
 
-        const currentTimer = timers[currentTimerIndex]; // Get the active timer
+        const currentTimer = timers[currentTimerIndex];
+        if (currentTimer?.status !== 'running') return;
 
-        if (currentTimer?.status === 'running') {
-            // Define a recursive function to handle timer updates
-            const handleTimeout = () => {
-                setTimers(prevTimers =>
-                    prevTimers.map((timer, index) =>
-                        index === currentTimerIndex
-                            ? {
-                                  ...timer,
-                                  // Increment for stopwatch; decrement for others
-                                  duration: timer.type === 'stopwatch' ? timer.duration + 10 : Math.max(timer.duration - 10, 0),
-                                  // Mark timers as "completed" when duration reaches 0
-                                  status: timer.type !== 'stopwatch' && timer.duration <= 10 ? 'completed' : timer.status,
-                              }
-                            : timer,
-                    ),
-                );
+        const intervalId = setInterval(() => {
+            setTimers(prevTimers => {
+                const updatedTimers = [...prevTimers];
+                const timer = updatedTimers[currentTimerIndex];
 
-                // If it's not a stopwatch and the duration is 0, complete the timer
-                if (currentTimer.type !== 'stopwatch' && currentTimer.duration <= 10) {
-                    fastForward(); // Move to the next timer
-                    return; // Stop recursion for this timer
+                if (!timer) return prevTimers;
+
+                switch (timer.type) {
+                    case 'stopwatch':
+                        timer.duration += 10;
+                        break;
+
+                    case 'countdown':
+                        timer.duration = Math.max(0, timer.duration - 10);
+                        if (timer.duration === 0) {
+                            timer.status = 'completed';
+                        }
+                        break;
+
+                    case 'XY':
+                    case 'tabata':
+                        timer.duration = Math.max(0, timer.duration - 10);
+                        if (timer.duration === 0) {
+                            if (timer.isWorking) {
+                                timer.isWorking = false;
+                                timer.duration = timer.restTime;
+                            } else {
+                                timer.currentRound++;
+                                if (timer.currentRound > timer.rounds) {
+                                    timer.status = 'completed';
+                                } else {
+                                    timer.isWorking = true;
+                                    timer.duration = timer.workTime;
+                                }
+                            }
+                        }
+                        break;
                 }
 
-                // Schedule the next update using setTimeout
-                setTimeout(handleTimeout, 10); // Repeat after 10ms
-            };
+                return updatedTimers;
+            });
+        }, 10);
 
-            // Start the first timeout
-            handleTimeout();
-        }
+        return () => clearInterval(intervalId);
     }, [currentTimerIndex, timers]);
 
-    // ------------------- Add Timer -------------------
-
-    // Adds a new timer to the list
     const addTimer = (timer: Timer) => {
-        setTimers(prevTimers => [...prevTimers, timer]); // Append the new timer to the list
+        setTimers(prev => [...prev, timer]);
     };
 
-    // ------------------- Reset Timers -------------------
+    const removeTimer = (id: string) => {
+        setTimers(prev => prev.filter(timer => timer.id !== id));
+        if (currentTimerIndex !== null) {
+            setCurrentTimerIndex(prev => (prev !== null && timers[prev].id === id ? null : prev));
+        }
+    };
 
-    // Resets all timers to their initial state
     const resetTimers = () => {
-        setTimers(prevTimers =>
-            prevTimers.map(timer => ({
-                ...timer,
-                duration: timer.type === 'stopwatch' ? 0 : timer.duration, // Reset stopwatch to 0
-                status: 'not running', // Set all timers to "not running"
-            })),
+        setTimers(prev =>
+            prev.map(timer => {
+                switch (timer.type) {
+                    case 'stopwatch':
+                        return { ...timer, duration: 0, status: 'not running' };
+                    case 'countdown':
+                        return { ...timer, duration: timer.initialDuration, status: 'not running' };
+                    case 'XY':
+                    case 'tabata':
+                        return {
+                            ...timer,
+                            duration: timer.workTime,
+                            currentRound: 1,
+                            isWorking: true,
+                            status: 'not running',
+                        };
+                }
+            }),
         );
-        setCurrentTimerIndex(null); // Clear the active timer index
+        setCurrentTimerIndex(null);
     };
 
-    // ------------------- Start/Pause Timer -------------------
-
-    // Starts or pauses the current timer
     const toggleStartPause = () => {
-        if (currentTimerIndex === null) {
-            // If no timer is active, start the first timer
+        if (currentTimerIndex === null && timers.length > 0) {
             setCurrentTimerIndex(0);
-            setTimers(prevTimers => prevTimers.map((timer, index) => (index === 0 ? { ...timer, status: 'running' } : timer)));
-        } else {
-            // Otherwise, toggle the current timer's status
-            setTimers(prevTimers => prevTimers.map((timer, index) => (index === currentTimerIndex ? { ...timer, status: timer.status === 'running' ? 'paused' : 'running' } : timer)));
+            setTimers(prev => prev.map((timer, index) => (index === 0 ? { ...timer, status: 'running' } : timer)));
+        } else if (currentTimerIndex !== null) {
+            setTimers(prev => prev.map((timer, index) => (index === currentTimerIndex ? { ...timer, status: timer.status === 'running' ? 'paused' : 'running' } : timer)));
         }
     };
 
-    // ------------------- Fast Forward -------------------
-
-    // Completes the current timer and moves to the next
     const fastForward = () => {
-        if (currentTimerIndex === null) return; // Do nothing if no timer is active
+        if (currentTimerIndex === null) return;
 
-        // Mark the current timer as completed
-        setTimers(prevTimers => prevTimers.map((timer, index) => (index === currentTimerIndex ? { ...timer, status: 'completed' } : timer)));
+        setTimers(prev => prev.map((timer, index) => (index === currentTimerIndex ? { ...timer, status: 'completed' } : timer)));
 
-        // Move to the next timer, if available
-        const nextTimerIndex = currentTimerIndex + 1;
-        if (nextTimerIndex < timers.length) {
-            setCurrentTimerIndex(nextTimerIndex); // Set the next timer as active
-            setTimers(prevTimers => prevTimers.map((timer, index) => (index === nextTimerIndex ? { ...timer, status: 'running' } : timer)));
+        const nextIndex = currentTimerIndex + 1;
+        if (nextIndex < timers.length) {
+            setCurrentTimerIndex(nextIndex);
+            setTimers(prev => prev.map((timer, index) => (index === nextIndex ? { ...timer, status: 'running' } : timer)));
         } else {
-            setCurrentTimerIndex(null); // No more timers to run
+            setCurrentTimerIndex(null);
         }
     };
 
-    // ------------------- Provide Context -------------------
+    const getTotalTime = () => {
+        return timers.reduce((total, timer) => {
+            switch (timer.type) {
+                case 'stopwatch':
+                    return total + timer.duration;
+                case 'countdown':
+                    return total + timer.initialDuration;
+                case 'XY':
+                case 'tabata':
+                    return total + (timer.workTime + timer.restTime) * timer.rounds;
+            }
+        }, 0);
+    };
 
-    // Provide the TimerContext to child components
     return (
         <TimerContext.Provider
             value={{
@@ -144,7 +191,9 @@ export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 toggleStartPause,
                 fastForward,
                 addTimer,
+                removeTimer,
                 resetTimers,
+                getTotalTime,
             }}
         >
             {children}
@@ -152,13 +201,10 @@ export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     );
 };
 
-// ------------------- useTimerContext Hook -------------------
-
-// Custom hook to access the TimerContext
 export const useTimerContext = () => {
     const context = useContext(TimerContext);
     if (!context) {
-        throw new Error('useTimerContext must be used within a TimerProvider'); // Ensure proper usage
+        throw new Error('useTimerContext must be used within a TimerProvider');
     }
     return context;
 };
