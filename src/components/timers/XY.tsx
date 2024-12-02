@@ -1,5 +1,6 @@
-import { useTimerContext } from "../../TimerContext";
-import styled from "styled-components";
+import styled from 'styled-components';
+import { useTimerContext } from '../../TimerContext';
+import type { Timer } from '../../TimerContext';
 
 // ------------------- Styled Components -------------------
 
@@ -29,161 +30,137 @@ const Label = styled.div`
   font-size: 1.2rem;
   color: #ffd700;
   text-align: center;
+  font-weight: bold;
 `;
 
-const StatusBadge = styled.div<{ status: string }>`
+const RoundInfo = styled.div`
+  font-size: 1.5rem;
+  color: #ffd700;
+  margin: 10px 0;
+`;
+
+const PhaseIndicator = styled.div<{ isWorking: boolean }>`
+  font-size: 1.8rem;
+  color: ${props => (props.isWorking ? '#2ecc40' : '#ff851b')};
+  font-weight: bold;
+  padding: 10px 20px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid ${props => (props.isWorking ? '#2ecc40' : '#ff851b')};
+  text-transform: uppercase;
+  letter-spacing: 2px;
+`;
+
+const StatusBadge = styled.div<{ status: Timer['status'] }>`
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.9rem;
   font-weight: bold;
   text-transform: uppercase;
   background-color: ${({ status }) => {
-    switch (status) {
-      case 'running':
-        return '#2ecc40';
-      case 'paused':
-        return '#ff851b';
-      case 'completed':
-        return '#ff4136';
-      default:
-        return '#7f8c8d';
-    }
+      switch (status) {
+          case 'running':
+              return '#2ecc40';
+          case 'paused':
+              return '#ff851b';
+          case 'completed':
+              return '#ff4136';
+          default:
+              return '#7f8c8d';
+      }
   }};
   color: white;
 `;
 
-const ProgressBar = styled.div`
-  width: 100%;
-  height: 10px;
-  background-color: #333;
-  border-radius: 5px;
-  overflow: hidden;
-`;
-
-const Progress = styled.div<{ percent: number; isWorking: boolean }>`
-  width: ${props => props.percent}%;
-  height: 100%;
-  background-color: ${props => props.isWorking ? '#2ecc40' : '#ff851b'};
-  transition: width 0.3s ease;
-`;
-
-const InfoGrid = styled.div`
+const TimerInfo = styled.div`
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   width: 100%;
-  text-align: center;
+  max-width: 300px;
+  margin-top: 10px;
 `;
 
-const InfoItem = styled.div`
+const InfoBox = styled.div`
   background: rgba(0, 0, 0, 0.3);
   padding: 10px;
   border-radius: 5px;
+  text-align: center;
   color: #ffd700;
-`;
-
-const PhaseIndicator = styled.div<{ isWorking: boolean }>`
-  font-size: 1.2rem;
-  color: ${props => props.isWorking ? '#2ecc40' : '#ff851b'};
-  font-weight: bold;
-  text-transform: uppercase;
-  margin: 10px 0;
 `;
 
 // ------------------- Helper Functions -------------------
 
 const formatTime = (timeInMilliseconds: number): string => {
-  const totalSeconds = Math.ceil(timeInMilliseconds / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    const totalSeconds = Math.ceil(timeInMilliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
+
+// ------------------- Component Interface -------------------
+
+interface XYProps {
+    duration: number;
+    currentRound: number;
+    rounds: number;
+    workTime: number;
+    restTime: number;
+    isWorking: boolean;
+    status: Timer['status'];
+    isActive?: boolean;
+}
 
 // ------------------- XY Timer Component -------------------
 
-interface XYProps {
-  duration: number;
-  currentRound: number;
-  rounds: number;
-  workTime: number;
-  restTime: number;
-  isWorking: boolean;
-  status: 'not running' | 'running' | 'paused' | 'completed';
-  isActive?: boolean;
-}
+export default function XY({ duration, currentRound, rounds, workTime, restTime, isWorking, status, isActive = false }: XYProps) {
+    const { fastForward } = useTimerContext();
 
-export default function XY({
-  duration,
-  currentRound,
-  rounds,
-  workTime,
-  restTime,
-  isWorking,
-  status,
-  isActive = false
-}: XYProps) {
-  const { fastForward } = useTimerContext();
+    // Handle interval completion
+    if (duration <= 0 && status === 'running') {
+        fastForward();
+    }
 
-  // Calculate progress percentage for current interval
-  const currentInterval = isWorking ? workTime : restTime;
-  const progressPercent = (duration / currentInterval) * 100;
+    // Only show detailed info when timer is active
+    const renderActiveInfo = () => {
+        if (!isActive) return null;
 
-  // Check if current interval is complete
-  if (duration <= 0 && status === 'running') {
-    fastForward();
-  }
+        return (
+            <>
+                <PhaseIndicator isWorking={isWorking}>{isWorking ? 'Work' : 'Rest'}</PhaseIndicator>
+                <RoundInfo>
+                    Round {currentRound} of {rounds}
+                </RoundInfo>
+                <TimerInfo>
+                    <InfoBox>Work: {formatTime(workTime)}</InfoBox>
+                    <InfoBox>Rest: {formatTime(restTime)}</InfoBox>
+                    <InfoBox>Current: {formatTime(duration)}</InfoBox>
+                    <InfoBox>Phase: {isWorking ? 'Work' : 'Rest'}</InfoBox>
+                </TimerInfo>
+            </>
+        );
+    };
 
-  return (
-    <Container>
-      <Label>XY TIMER</Label>
-      
-      {isActive && (
-        <PhaseIndicator isWorking={isWorking}>
-          {isWorking ? 'Work' : 'Rest'}
-        </PhaseIndicator>
-      )}
+    // Show summary when timer is not active
+    const renderSummary = () => {
+        if (isActive) return null;
 
-      <TimeDisplay>
-        {formatTime(duration)}
-      </TimeDisplay>
+        return (
+            <TimerInfo>
+                <InfoBox>Rounds: {rounds}</InfoBox>
+                <InfoBox>Work: {formatTime(workTime)}</InfoBox>
+                <InfoBox>Rest: {formatTime(restTime)}</InfoBox>
+                <InfoBox>Total: {formatTime((workTime + restTime) * rounds)}</InfoBox>
+            </TimerInfo>
+        );
+    };
 
-      <StatusBadge status={status}>
-        {status}
-      </StatusBadge>
-
-      {isActive && (
-        <>
-          <InfoGrid>
-            <InfoItem>
-              Round {currentRound} of {rounds}
-            </InfoItem>
-            <InfoItem>
-              {isWorking ? 
-                `Work: ${formatTime(workTime)}` : 
-                `Rest: ${formatTime(restTime)}`
-              }
-            </InfoItem>
-          </InfoGrid>
-
-          <ProgressBar>
-            <Progress 
-              percent={progressPercent} 
-              isWorking={isWorking}
-            />
-          </ProgressBar>
-        </>
-      )}
-
-      {!isActive && (
-        <InfoGrid>
-          <InfoItem>Rounds: {rounds}</InfoItem>
-          <InfoItem>Work: {formatTime(workTime)}</InfoItem>
-          <InfoItem>Rest: {formatTime(restTime)}</InfoItem>
-          <InfoItem>
-            Total: {formatTime((workTime + restTime) * rounds)}
-          </InfoItem>
-        </InfoGrid>
-      )}
-    </Container>
-  );
+    return (
+        <Container role="timer" aria-label="XY Timer">
+            <Label>XY TIMER</Label>
+            <TimeDisplay>{formatTime(duration)}</TimeDisplay>
+            <StatusBadge status={status}>{status}</StatusBadge>
+            {isActive ? renderActiveInfo() : renderSummary()}
+        </Container>
+    );
 }
