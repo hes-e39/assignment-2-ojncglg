@@ -1,169 +1,210 @@
-// Import necessary hooks and utilities from React and React Router
-import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // For navigation between routes
-import { useTimerContext } from "../TimerContext"; // Custom hook to access timer context
-import { v4 as uuidv4 } from "uuid"; // To generate unique IDs for timers
-import styled from "styled-components"; // For styling components
-import type { FC } from "react"; // Type-only import for functional components
+import { createContext, useContext, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
-// ------------------- Styled Components -------------------
+// Base timer configuration
+interface BaseTimer {
+    id: string;
+    type: 'stopwatch' | 'countdown' | 'XY' | 'tabata';
+    status: 'not running' | 'running' | 'paused' | 'completed';
+}
 
-// Container: Styles the main page layout with centered content and dark theme
-const Container = styled.div`
-  display: flex;
-  flex-direction: column; /* Stack items vertically */
-  align-items: center; /* Center items horizontally */
-  justify-content: center; /* Center items vertically */
-  background-color: #222; /* Dark background color */
-  color: #ffd700; /* Yellow text color */
-  font-family: "Digital-7", "Roboto Mono", monospace; /* Digital-style font */
-  min-height: 100vh; /* Full viewport height */
-  padding: 20px; /* Add padding around content */
-`;
+// Specific timer configurations
+interface StopwatchTimer extends BaseTimer {
+    type: 'stopwatch';
+    duration: number; // Current elapsed time
+}
 
-// Title: Styles the heading for the page
-const Title = styled.h1`
-  font-size: 2rem; /* Medium font size */
-  margin-bottom: 20px; /* Space below the heading */
-`;
+interface CountdownTimer extends BaseTimer {
+    type: 'countdown';
+    duration: number; // Time remaining
+    initialDuration: number; // Starting duration
+}
 
-// Form: Styles the form for adding a new timer
-const Form = styled.form`
-  display: flex;
-  flex-direction: column; /* Stack form elements vertically */
-  gap: 20px; /* Add space between form elements */
-  width: 100%; /* Make the form fill its container */
-  max-width: 400px; /* Limit the width for larger screens */
-`;
+interface XYTimer extends BaseTimer {
+    type: 'XY';
+    rounds: number;
+    currentRound: number;
+    workTime: number;
+    restTime: number;
+    isWorking: boolean;
+    duration: number; // Current interval time remaining
+}
 
-// Select: Styles the dropdown for selecting the timer type
-const Select = styled.select`
-  padding: 15px; /* Inner padding for better click area */
-  font-size: 1.2rem; /* Medium font size */
-  border-radius: 5px; /* Rounded corners */
-  border: none; /* Remove default border */
-  background-color: #000; /* Black background color */
-  color: #ffd700; /* Yellow text color */
-`;
+interface TabataTimer extends BaseTimer {
+    type: 'tabata';
+    rounds: number;
+    currentRound: number;
+    workTime: number;
+    restTime: number;
+    isWorking: boolean;
+    duration: number; // Current interval time remaining
+}
 
-// Input: Styles the input field for entering timer duration
-const Input = styled.input`
-  padding: 15px; /* Inner padding for better typing area */
-  font-size: 1.2rem; /* Medium font size */
-  border-radius: 5px; /* Rounded corners */
-  border: none; /* Remove default border */
-  background-color: #000; /* Black background color */
-  color: #ffd700; /* Yellow text color */
-`;
+// Union type of all timer types
+export type Timer = StopwatchTimer | CountdownTimer | XYTimer | TabataTimer;
 
-// ButtonContainer: Styles the container for buttons
-const ButtonContainer = styled.div`
-  display: flex; /* Place buttons side by side */
-  gap: 20px; /* Add space between buttons */
-  justify-content: center; /* Center align the buttons */
-  margin-top: 20px; /* Add space above the buttons */
-`;
-
-// Button: Styles the buttons for submitting or canceling the form
-const Button = styled.button`
-  padding: 15px 30px; /* Inner padding for better click area */
-  font-size: 1.2rem; /* Medium font size */
-  border-radius: 5px; /* Rounded corners */
-  border: none; /* Remove default border */
-  cursor: pointer; /* Pointer cursor on hover */
-  font-family: "Digital-7", "Roboto Mono", monospace; /* Digital-style font */
-  text-transform: uppercase; /* Uppercase text */
-  font-weight: bold; /* Bold text */
-  transition: all 0.3s; /* Smooth hover effect */
-
-  /* Default styles for gray buttons */
-  background-color: #ccc; /* Light gray background */
-  color: #000; /* Black text color */
-
-  &:hover {
-    opacity: 0.9; /* Slightly transparent on hover */
-  }
-
-  &:active {
-    transform: scale(0.95); /* Shrinks button slightly on click */
-  }
-`;
-
-// ------------------- AddTimerView Component -------------------
-
-// AddTimerView: Page for adding a new timer
-const AddTimerView: FC = () => {
-  const { addTimer } = useTimerContext(); // Access the addTimer function from TimerContext
-  const navigate = useNavigate(); // Hook to navigate between routes
-
-  // State to track the type of timer being added
-  const [type, setType] = useState<"stopwatch" | "countdown" | "XY" | "tabata">("stopwatch");
-
-  // State to track the duration of the timer
-  const [duration, setDuration] = useState<number>(0);
-
-  // ------------------- Handle Form Submission -------------------
-
-  const handleAddTimer = (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission behavior
-
-    // Add the timer to the TimerContext
-    addTimer({
-      id: uuidv4(), // Generate a unique ID for the timer
-      type, // Timer type (stopwatch, countdown, etc.)
-      duration: type === "stopwatch" ? 0 : duration * 1000, // Convert duration to milliseconds (0 for stopwatch)
-      status: "not running", // Initial status of the timer
-    });
-
-    // Navigate back to the main page after adding the timer
-    navigate("/");
-  };
-
-  // ------------------- Render Component -------------------
-
-  return (
-    <Container>
-      {/* Page Title */}
-      <Title>Add a New Timer</Title>
-
-      {/* Form for adding a timer */}
-      <Form onSubmit={handleAddTimer}>
-        {/* Dropdown for selecting timer type */}
-        <Select
-          value={type} // Bind to state
-          onChange={(e) =>
-            setType(e.target.value as "stopwatch" | "countdown" | "XY" | "tabata")
-          }
-        >
-          {/* Timer type options */}
-          <option value="stopwatch">Stopwatch</option>
-          <option value="countdown">Countdown</option>
-          <option value="XY">XY Timer</option>
-          <option value="tabata">Tabata Timer</option>
-        </Select>
-
-        {/* Input for timer duration, only shown for non-stopwatch timers */}
-        {type !== "stopwatch" && (
-          <Input
-            type="number" // Input type is number
-            min="0" // Minimum value is 0
-            placeholder="Enter duration (seconds)" // Placeholder text
-            value={duration} // Bind to state
-            onChange={(e) => setDuration(Number(e.target.value))} // Update state on change
-            required // Make input required
-          />
-        )}
-
-        {/* Buttons for submitting or canceling */}
-        <ButtonContainer>
-          <Button type="submit">Add Timer</Button> {/* Submit the form */}
-          <Button type="button" onClick={() => navigate("/")}>
-            Cancel
-          </Button> {/* Navigate back without adding a timer */}
-        </ButtonContainer>
-      </Form>
-    </Container>
-  );
+type TimerContextType = {
+    timers: Timer[];
+    currentTimerIndex: number | null;
+    toggleStartPause: () => void;
+    fastForward: () => void;
+    addTimer: (timer: Timer) => void;
+    removeTimer: (id: string) => void;
+    resetTimers: () => void;
+    getTotalTime: () => number;
 };
 
-export default AddTimerView; // Export the component
+const TimerContext = createContext<TimerContextType | undefined>(undefined);
+
+export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [timers, setTimers] = useState<Timer[]>([]);
+    const [currentTimerIndex, setCurrentTimerIndex] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (currentTimerIndex === null) return;
+
+        const currentTimer = timers[currentTimerIndex];
+        if (currentTimer?.status !== 'running') return;
+
+        const intervalId = setInterval(() => {
+            setTimers(prevTimers => {
+                const updatedTimers = [...prevTimers];
+                const timer = updatedTimers[currentTimerIndex];
+
+                if (!timer) return prevTimers;
+
+                switch (timer.type) {
+                    case 'stopwatch':
+                        timer.duration += 10;
+                        break;
+
+                    case 'countdown':
+                        timer.duration = Math.max(0, timer.duration - 10);
+                        if (timer.duration === 0) {
+                            timer.status = 'completed';
+                        }
+                        break;
+
+                    case 'XY':
+                    case 'tabata':
+                        timer.duration = Math.max(0, timer.duration - 10);
+                        if (timer.duration === 0) {
+                            if (timer.isWorking) {
+                                timer.isWorking = false;
+                                timer.duration = timer.restTime;
+                            } else {
+                                timer.currentRound++;
+                                if (timer.currentRound > timer.rounds) {
+                                    timer.status = 'completed';
+                                } else {
+                                    timer.isWorking = true;
+                                    timer.duration = timer.workTime;
+                                }
+                            }
+                        }
+                        break;
+                }
+
+                return updatedTimers;
+            });
+        }, 10);
+
+        return () => clearInterval(intervalId);
+    }, [currentTimerIndex, timers]);
+
+    const addTimer = (timer: Timer) => {
+        setTimers(prev => [...prev, timer]);
+    };
+
+    const removeTimer = (id: string) => {
+        setTimers(prev => prev.filter(timer => timer.id !== id));
+        if (currentTimerIndex !== null) {
+            setCurrentTimerIndex(prev => (prev !== null && timers[prev].id === id ? null : prev));
+        }
+    };
+
+    const resetTimers = () => {
+        setTimers(prev =>
+            prev.map(timer => {
+                switch (timer.type) {
+                    case 'stopwatch':
+                        return { ...timer, duration: 0, status: 'not running' };
+                    case 'countdown':
+                        return { ...timer, duration: timer.initialDuration, status: 'not running' };
+                    case 'XY':
+                    case 'tabata':
+                        return {
+                            ...timer,
+                            duration: timer.workTime,
+                            currentRound: 1,
+                            isWorking: true,
+                            status: 'not running',
+                        };
+                }
+            }),
+        );
+        setCurrentTimerIndex(null);
+    };
+
+    const toggleStartPause = () => {
+        if (currentTimerIndex === null && timers.length > 0) {
+            setCurrentTimerIndex(0);
+            setTimers(prev => prev.map((timer, index) => (index === 0 ? { ...timer, status: 'running' } : timer)));
+        } else if (currentTimerIndex !== null) {
+            setTimers(prev => prev.map((timer, index) => (index === currentTimerIndex ? { ...timer, status: timer.status === 'running' ? 'paused' : 'running' } : timer)));
+        }
+    };
+
+    const fastForward = () => {
+        if (currentTimerIndex === null) return;
+
+        setTimers(prev => prev.map((timer, index) => (index === currentTimerIndex ? { ...timer, status: 'completed' } : timer)));
+
+        const nextIndex = currentTimerIndex + 1;
+        if (nextIndex < timers.length) {
+            setCurrentTimerIndex(nextIndex);
+            setTimers(prev => prev.map((timer, index) => (index === nextIndex ? { ...timer, status: 'running' } : timer)));
+        } else {
+            setCurrentTimerIndex(null);
+        }
+    };
+
+    const getTotalTime = () => {
+        return timers.reduce((total, timer) => {
+            switch (timer.type) {
+                case 'stopwatch':
+                    return total + timer.duration;
+                case 'countdown':
+                    return total + timer.initialDuration;
+                case 'XY':
+                case 'tabata':
+                    return total + (timer.workTime + timer.restTime) * timer.rounds;
+            }
+        }, 0);
+    };
+
+    return (
+        <TimerContext.Provider
+            value={{
+                timers,
+                currentTimerIndex,
+                toggleStartPause,
+                fastForward,
+                addTimer,
+                removeTimer,
+                resetTimers,
+                getTotalTime,
+            }}
+        >
+            {children}
+        </TimerContext.Provider>
+    );
+};
+
+export const useTimerContext = () => {
+    const context = useContext(TimerContext);
+    if (!context) {
+        throw new Error('useTimerContext must be used within a TimerProvider');
+    }
+    return context;
+};
