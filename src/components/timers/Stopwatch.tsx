@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import { useTimerContext } from '../../TimerContext';
+import type { Timer } from '../../TimerContext';
 
 // ------------------- Styled Components -------------------
 
@@ -23,15 +24,17 @@ const TimeDisplay = styled.div`
   padding: 20px;
   border-radius: 8px;
   min-width: 300px;
+  aria-live: polite;
 `;
 
 const Label = styled.div`
   font-size: 1.2rem;
   color: #ffd700;
   text-align: center;
+  font-weight: bold;
 `;
 
-const StatusBadge = styled.div<{ status: string }>`
+const StatusBadge = styled.div<{ status: Timer['status'] }>`
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.9rem;
@@ -52,6 +55,13 @@ const StatusBadge = styled.div<{ status: string }>`
   color: white;
 `;
 
+const TimeInfo = styled.div`
+  color: #ffd700;
+  font-size: 1rem;
+  text-align: center;
+  margin-top: 10px;
+`;
+
 // ------------------- Helper Functions -------------------
 
 const formatTime = (timeInMilliseconds: number): string => {
@@ -65,7 +75,7 @@ const formatTime = (timeInMilliseconds: number): string => {
 
 interface StopwatchProps {
     duration: number;
-    status: 'not running' | 'running' | 'paused' | 'completed';
+    status: Timer['status']; // Using the exact type from TimerContext
     isActive?: boolean;
 }
 
@@ -83,12 +93,22 @@ export default function Stopwatch({ duration, status, isActive = false }: Stopwa
         fastForward();
     }
 
+    const renderTimeInfo = () => {
+        if (!isActive) return null;
+
+        return (
+            <TimeInfo role="status" aria-live="polite">
+                {duration < MAX_TIME ? <span>Time until max: {formatTime(MAX_TIME - duration)}</span> : <span>Maximum time reached</span>}
+            </TimeInfo>
+        );
+    };
+
     return (
-        <Container>
+        <Container role="timer" aria-label="Stopwatch Timer">
             <Label>STOPWATCH</Label>
             <TimeDisplay>{formatTime(Math.min(duration, MAX_TIME))}</TimeDisplay>
             <StatusBadge status={status}>{status}</StatusBadge>
-            {isActive && <div>{duration < MAX_TIME ? <span>Time until max: {formatTime(MAX_TIME - duration)}</span> : <span>Maximum time reached</span>}</div>}
+            {renderTimeInfo()}
         </Container>
     );
 }
