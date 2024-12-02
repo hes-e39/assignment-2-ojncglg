@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import { useTimerContext } from '../../TimerContext';
+import type { Timer } from '../../TimerContext';
 
 // ------------------- Styled Components -------------------
 
@@ -29,9 +30,37 @@ const Label = styled.div`
   font-size: 1.2rem;
   color: #ffd700;
   text-align: center;
+  font-weight: bold;
 `;
 
-const StatusBadge = styled.div<{ status: string }>`
+const RoundInfo = styled.div`
+  font-size: 1.8rem;
+  color: #ffd700;
+  margin: 10px 0;
+`;
+
+// PhaseIndicator is bigger and more prominent for Tabata
+const PhaseIndicator = styled.div<{ isWorking: boolean }>`
+  font-size: 2.5rem;
+  color: ${props => (props.isWorking ? '#2ecc40' : '#ff851b')};
+  font-weight: bold;
+  padding: 15px 30px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 3px solid ${props => (props.isWorking ? '#2ecc40' : '#ff851b')};
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  text-shadow: 0 0 10px ${props => (props.isWorking ? '#2ecc40' : '#ff851b')};
+  animation: pulse 1s infinite;
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+`;
+
+const StatusBadge = styled.div<{ status: Timer['status'] }>`
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 0.9rem;
@@ -52,53 +81,44 @@ const StatusBadge = styled.div<{ status: string }>`
   color: white;
 `;
 
-const ProgressBar = styled.div`
-  width: 100%;
-  height: 10px;
-  background-color: #333;
-  border-radius: 5px;
-  overflow: hidden;
-`;
-
-const Progress = styled.div<{ percent: number; isWorking: boolean }>`
-  width: ${props => props.percent}%;
-  height: 100%;
-  background-color: ${props => (props.isWorking ? '#2ecc40' : '#ff851b')};
-  transition: width 0.3s ease;
-`;
-
-const InfoGrid = styled.div`
+const TimerInfo = styled.div`
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   width: 100%;
-  text-align: center;
+  max-width: 300px;
+  margin-top: 10px;
 `;
 
-const InfoItem = styled.div`
+const InfoBox = styled.div`
   background: rgba(0, 0, 0, 0.3);
   padding: 10px;
   border-radius: 5px;
-  color: #ffd700;
-`;
-
-const PhaseIndicator = styled.div<{ isWorking: boolean }>`
-  font-size: 1.5rem;
-  color: ${props => (props.isWorking ? '#2ecc40' : '#ff851b')};
-  font-weight: bold;
-  text-transform: uppercase;
-  margin: 10px 0;
-  padding: 10px 20px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 5px;
-  border: 1px solid ${props => (props.isWorking ? '#2ecc40' : '#ff851b')};
-`;
-
-const RoundDisplay = styled.div`
-  font-size: 1.2rem;
-  color: #ffd700;
-  margin: 10px 0;
   text-align: center;
+  color: #ffd700;
+`;
+
+const ProgressRing = styled.div<{ percent: number; isWorking: boolean }>`
+  width: 200px;
+  height: 200px;
+  position: relative;
+  border-radius: 50%;
+  background: conic-gradient(
+    ${props => (props.isWorking ? '#2ecc40' : '#ff851b')} ${props => props.percent * 3.6}deg,
+    transparent ${props => props.percent * 3.6}deg
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &::before {
+    content: '';
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: #000;
+  }
 `;
 
 // ------------------- Helper Functions -------------------
@@ -110,7 +130,7 @@ const formatTime = (timeInMilliseconds: number): string => {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-// ------------------- Tabata Timer Component -------------------
+// ------------------- Component Interface -------------------
 
 interface TabataProps {
     duration: number;
@@ -119,67 +139,62 @@ interface TabataProps {
     workTime: number;
     restTime: number;
     isWorking: boolean;
-    status: 'not running' | 'running' | 'paused' | 'completed';
+    status: Timer['status'];
     isActive?: boolean;
 }
+
+// ------------------- Tabata Timer Component -------------------
 
 export default function Tabata({ duration, currentRound, rounds, workTime, restTime, isWorking, status, isActive = false }: TabataProps) {
     const { fastForward } = useTimerContext();
 
-    // Calculate progress percentage for current interval
+    // Calculate progress percentage for the current interval
     const currentInterval = isWorking ? workTime : restTime;
-    const progressPercent = (duration / currentInterval) * 100;
+    const progressPercent = Math.floor((duration / currentInterval) * 100);
 
-    // Calculate remaining rounds
-    const remainingRounds = rounds - currentRound + 1;
-
-    // Calculate total remaining time
-    const remainingTime = duration + (remainingRounds - 1) * (workTime + restTime) + (isWorking ? restTime : 0);
-
-    // Check if current interval is complete
     if (duration <= 0 && status === 'running') {
         fastForward();
     }
 
+    const renderActiveInfo = () => {
+        if (!isActive) return null;
+
+        return (
+            <>
+                <PhaseIndicator isWorking={isWorking}>{isWorking ? 'Work!' : 'Rest'}</PhaseIndicator>
+                <RoundInfo>
+                    Round {currentRound} of {rounds}
+                </RoundInfo>
+                <ProgressRing percent={progressPercent} isWorking={isWorking}>
+                    <TimeDisplay style={{ background: 'none', padding: 0 }}>{formatTime(duration)}</TimeDisplay>
+                </ProgressRing>
+                <TimerInfo>
+                    <InfoBox>Work: {formatTime(workTime)}</InfoBox>
+                    <InfoBox>Rest: {formatTime(restTime)}</InfoBox>
+                </TimerInfo>
+            </>
+        );
+    };
+
+    const renderSummary = () => {
+        if (isActive) return null;
+
+        return (
+            <TimerInfo>
+                <InfoBox>Rounds: {rounds}</InfoBox>
+                <InfoBox>Work: {formatTime(workTime)}</InfoBox>
+                <InfoBox>Rest: {formatTime(restTime)}</InfoBox>
+                <InfoBox>Total: {formatTime((workTime + restTime) * rounds)}</InfoBox>
+            </TimerInfo>
+        );
+    };
+
     return (
-        <Container>
-            <Label>TABATA TIMER</Label>
-
-            {isActive && (
-                <>
-                    <PhaseIndicator isWorking={isWorking}>{isWorking ? 'Work!' : 'Rest'}</PhaseIndicator>
-
-                    <RoundDisplay>
-                        Round {currentRound} of {rounds}
-                    </RoundDisplay>
-                </>
-            )}
-
-            <TimeDisplay>{formatTime(duration)}</TimeDisplay>
-
+        <Container role="timer" aria-label="Tabata Timer">
+            <Label>TABATA</Label>
+            {!isActive && <TimeDisplay>{formatTime(duration)}</TimeDisplay>}
             <StatusBadge status={status}>{status}</StatusBadge>
-
-            {isActive && (
-                <>
-                    <InfoGrid>
-                        <InfoItem>Interval: {formatTime(currentInterval)}</InfoItem>
-                        <InfoItem>Remaining: {formatTime(remainingTime)}</InfoItem>
-                    </InfoGrid>
-
-                    <ProgressBar>
-                        <Progress percent={progressPercent} isWorking={isWorking} />
-                    </ProgressBar>
-                </>
-            )}
-
-            {!isActive && (
-                <InfoGrid>
-                    <InfoItem>Rounds: {rounds}</InfoItem>
-                    <InfoItem>Work: {formatTime(workTime)}</InfoItem>
-                    <InfoItem>Rest: {formatTime(restTime)}</InfoItem>
-                    <InfoItem>Total: {formatTime((workTime + restTime) * rounds)}</InfoItem>
-                </InfoGrid>
-            )}
+            {isActive ? renderActiveInfo() : renderSummary()}
         </Container>
     );
 }
