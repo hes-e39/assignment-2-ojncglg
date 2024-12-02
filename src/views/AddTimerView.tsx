@@ -84,7 +84,7 @@ const Button = styled.button<{ $variant?: 'submit' | 'cancel' }>`
 
 // ------------------- AddTimerView Component -------------------
 
-export default function AddTimerView() {
+function AddTimerView() {
     const navigate = useNavigate();
     const { addTimer } = useTimerContext();
 
@@ -92,7 +92,7 @@ export default function AddTimerView() {
     const [type, setType] = useState<Timer['type']>('stopwatch');
 
     // Common timer states
-    const [duration, setDuration] = useState(60);
+    const [duration, setDuration] = useState<number | ''>(60);
 
     // XY and Tabata specific states
     const [rounds, setRounds] = useState(5);
@@ -101,6 +101,9 @@ export default function AddTimerView() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Ensure duration is a number for countdown timer
+        const finalDuration = typeof duration === 'number' ? duration : 0;
 
         let newTimer: Timer;
 
@@ -118,8 +121,8 @@ export default function AddTimerView() {
                 newTimer = {
                     id: uuidv4(),
                     type: 'countdown',
-                    duration: duration * 1000,
-                    initialDuration: duration * 1000,
+                    duration: finalDuration * 1000,
+                    initialDuration: finalDuration * 1000,
                     status: 'not running',
                 };
                 break;
@@ -174,7 +177,21 @@ export default function AddTimerView() {
                 {type === 'countdown' && (
                     <FormGroup>
                         <Label>Duration (seconds)</Label>
-                        <Input type="number" min="1" value={duration} onChange={e => setDuration(Math.max(1, Number.parseInt(e.target.value) || 0))} required />
+                        <Input
+                            type="number"
+                            min="0"
+                            value={duration}
+                            onChange={e => {
+                                const value = e.target.value;
+                                if (value === '') {
+                                    setDuration('');
+                                } else {
+                                    const num = Number.parseInt(value, 10);
+                                    setDuration(Number.isNaN(num) ? 0 : Math.max(0, num));
+                                }
+                            }}
+                            required
+                        />
                     </FormGroup>
                 )}
 
@@ -182,17 +199,47 @@ export default function AddTimerView() {
                     <>
                         <FormGroup>
                             <Label>Number of Rounds</Label>
-                            <Input type="number" min="1" value={rounds} onChange={e => setRounds(Math.max(1, Number.parseInt(e.target.value) || 0))} required />
+                            <Input
+                                type="number"
+                                min="1"
+                                value={rounds}
+                                onChange={e => {
+                                    const value = e.target.value;
+                                    const num = Number.parseInt(value, 10);
+                                    setRounds(Number.isNaN(num) ? 1 : Math.max(1, num));
+                                }}
+                                required
+                            />
                         </FormGroup>
 
                         <FormGroup>
                             <Label>Work Time (seconds)</Label>
-                            <Input type="number" min="1" value={workTime} onChange={e => setWorkTime(Math.max(1, Number.parseInt(e.target.value) || 0))} required />
+                            <Input
+                                type="number"
+                                min="1"
+                                value={workTime}
+                                onChange={e => {
+                                    const value = e.target.value;
+                                    const num = Number.parseInt(value, 10);
+                                    setWorkTime(Number.isNaN(num) ? 1 : Math.max(1, num));
+                                }}
+                                required
+                            />
                         </FormGroup>
 
                         <FormGroup>
                             <Label>Rest Time (seconds)</Label>
-                            <Input type="number" min="1" value={restTime} onChange={e => setRestTime(Math.max(1, Number.parseInt(e.target.value) || 0))} required />
+                            <Input
+                                type="number"
+                                min="1"
+                                value={restTime}
+                                onChange={e => {
+                                    const value = e.target.value;
+                                    const num = Number.parseInt(value, 10);
+                                    setRestTime(Number.isNaN(num) ? 1 : Math.max(1, num));
+                                }}
+                                required
+                            />
                         </FormGroup>
                     </>
                 )}
@@ -209,3 +256,5 @@ export default function AddTimerView() {
         </Container>
     );
 }
+
+export default AddTimerView;

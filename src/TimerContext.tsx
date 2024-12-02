@@ -9,18 +9,18 @@ interface BaseTimer {
 }
 
 // Specific timer configurations
-interface StopwatchTimer extends BaseTimer {
+export interface StopwatchTimer extends BaseTimer {
     type: 'stopwatch';
     duration: number; // Current elapsed time
 }
 
-interface CountdownTimer extends BaseTimer {
+export interface CountdownTimer extends BaseTimer {
     type: 'countdown';
     duration: number; // Time remaining
     initialDuration: number; // Starting duration
 }
 
-interface XYTimer extends BaseTimer {
+export interface XYTimer extends BaseTimer {
     type: 'XY';
     rounds: number;
     currentRound: number;
@@ -30,7 +30,7 @@ interface XYTimer extends BaseTimer {
     duration: number; // Current interval time remaining
 }
 
-interface TabataTimer extends BaseTimer {
+export interface TabataTimer extends BaseTimer {
     type: 'tabata';
     rounds: number;
     currentRound: number;
@@ -43,7 +43,7 @@ interface TabataTimer extends BaseTimer {
 // Union type of all timer types
 export type Timer = StopwatchTimer | CountdownTimer | XYTimer | TabataTimer;
 
-type TimerContextType = {
+export type TimerContextType = {
     timers: Timer[];
     currentTimerIndex: number | null;
     toggleStartPause: () => void;
@@ -54,7 +54,8 @@ type TimerContextType = {
     getTotalTime: () => number;
 };
 
-const TimerContext = createContext<TimerContextType | undefined>(undefined);
+// Export the context itself so components can use it directly if needed
+export const TimerContext = createContext<TimerContextType | undefined>(undefined);
 
 export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [timers, setTimers] = useState<Timer[]>([]);
